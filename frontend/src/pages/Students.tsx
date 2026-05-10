@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Search, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Badge from '../components/ui/Badge'
 import { api } from '../services/api'
 import type { RiskStudent, StudentsResponse } from '../types'
@@ -16,95 +16,59 @@ export default function Students() {
   const [data, setData] = useState<StudentsResponse | null>(null)
   const [page, setPage] = useState(1)
   const [riskFilter, setRiskFilter] = useState('all')
-  const [threshold, setThreshold] = useState<number | undefined>(undefined)
-  const [thresholdInput, setThresholdInput] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const pageSize = 20
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
-      const res = await api.students({
-        page,
-        pageSize,
-        riskFilter,
-        threshold,
-      })
+      const res = await api.students({ page, pageSize, riskFilter })
       setData(res)
-    } catch {
+    } catch (e: any) {
+      setError(e.message)
       setData(null)
     } finally {
       setLoading(false)
     }
-  }, [page, riskFilter, threshold])
+  }, [page, riskFilter])
 
   useEffect(() => { load() }, [load])
 
   const totalPages = data ? Math.ceil(data.total / pageSize) : 1
 
-  const applyThreshold = () => {
-    const v = parseFloat(thresholdInput)
-    if (!isNaN(v) && v >= 0 && v <= 1) {
-      setThreshold(v)
-      setPage(1)
-    }
-  }
-
   return (
     <div className="flex-1 overflow-auto p-6 space-y-4">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex gap-1.5">
-          {RISK_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => { setRiskFilter(f.value); setPage(1) }}
-              className={clsx(
-                'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                riskFilter === f.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <Filter size={16} className="text-slate-400" />
-          <input
-            type="number"
-            min={0} max={1} step={0.01}
-            value={thresholdInput}
-            onChange={(e) => setThresholdInput(e.target.value)}
-            placeholder="τ (0–1)"
-            className="w-28 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+      {/* Risk level filter */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {RISK_FILTERS.map((f) => (
           <button
-            onClick={applyThreshold}
-            className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm hover:bg-slate-700"
+            key={f.value}
+            onClick={() => { setRiskFilter(f.value); setPage(1) }}
+            className={clsx(
+              'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+              riskFilter === f.value
+                ? 'bg-blue-600 text-white'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+            )}
           >
-            Aplicar
+            {f.label}
           </button>
-          {threshold !== undefined && (
-            <button
-              onClick={() => { setThreshold(undefined); setThresholdInput('') }}
-              className="text-xs text-slate-400 hover:text-slate-600"
-            >
-              Limpiar
-            </button>
-          )}
-        </div>
+        ))}
       </div>
 
-      {/* Summary */}
-      {data && (
+      {/* Summary / error */}
+      {error ? (
+        <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+          {error}
+        </p>
+      ) : data ? (
         <p className="text-slate-500 text-sm">
           {data.total.toLocaleString()} estudiantes encontrados
-          {threshold !== undefined && ` (τ = ${threshold.toFixed(2)})`}
         </p>
-      )}
+      ) : null}
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -131,11 +95,11 @@ export default function Students() {
                     <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
                   </td>
                 </tr>
-              ) : data?.students.length === 0 ? (
+              ) : !data || data.students.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-10 text-slate-400">Sin resultados</td>
                 </tr>
-              ) : data?.students.map((s: RiskStudent) => (
+              ) : data.students.map((s: RiskStudent) => (
                 <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 text-slate-400 font-mono text-xs">{s.id}</td>
                   <td className="px-4 py-3 text-slate-700">{s.age_at_enrollment}</td>
@@ -150,12 +114,8 @@ export default function Students() {
                       {s.debtor ? '✓' : '–'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {s.sem1_grade.toFixed(1)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {s.sem2_grade.toFixed(1)}
-                  </td>
+                  <td className="px-4 py-3 text-right font-mono">{s.sem1_grade.toFixed(1)}</td>
+                  <td className="px-4 py-3 text-right font-mono">{s.sem2_grade.toFixed(1)}</td>
                   <td className="px-4 py-3 text-right">
                     <span className={clsx(
                       'font-bold font-mono',

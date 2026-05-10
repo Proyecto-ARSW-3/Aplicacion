@@ -1,4 +1,5 @@
 """Central model manager: loads data, trains all models, and serves predictions."""
+import math
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -157,12 +158,18 @@ class ModelManager:
         min_len = min(len(fpr), len(tpr), len(thresholds))
         points = []
         for i in range(min_len):
-            youden = tpr[i] - fpr[i]
+            t = float(thresholds[i])
+            # Skip any non-finite threshold (sklearn synthetic first point can be inf)
+            if not math.isfinite(t):
+                continue
+            s = float(tpr[i])
+            sp = float(fpr[i])
+            youden = s - sp
             points.append({
-                "threshold": round(float(thresholds[i]), 3),
-                "sensitivity": round(float(tpr[i]), 4),
-                "one_minus_specificity": round(float(fpr[i]), 4),
-                "youden_index": round(float(youden), 4),
+                "threshold": round(t, 3),
+                "sensitivity": round(s, 4),
+                "one_minus_specificity": round(sp, 4),
+                "youden_index": round(youden, 4),
             })
         return points
 

@@ -1,3 +1,4 @@
+import math
 import time
 import numpy as np
 from sklearn.linear_model import LogisticRegression
@@ -44,9 +45,21 @@ def _compute_metrics(model, X_test, y_test, model_name: str) -> dict:
 
     fpr, tpr, thresholds = roc_curve(y_test, y_proba)
     youden = tpr - fpr
-    optimal_idx = np.argmax(youden)
-    optimal_threshold = float(thresholds[optimal_idx]) if len(thresholds) > optimal_idx else 0.5
-    optimal_threshold = max(0.1, min(0.9, optimal_threshold))
+
+    # sklearn prepends max_score+1 as the first threshold (can be inf) — strip non-finite values
+    finite_mask = np.array([math.isfinite(t) for t in thresholds])
+    fpr_clean = fpr[finite_mask]
+    tpr_clean = tpr[finite_mask]
+    thresholds_clean = thresholds[finite_mask]
+
+    if len(thresholds_clean) > 0:
+        youden_clean = tpr_clean - fpr_clean
+        optimal_idx = int(np.argmax(youden_clean))
+        optimal_threshold = float(thresholds_clean[optimal_idx])
+        optimal_threshold = max(0.1, min(0.9, optimal_threshold))
+    else:
+        fpr_clean, tpr_clean, thresholds_clean = fpr, tpr, thresholds
+        optimal_threshold = 0.5
 
     return {
         "accuracy": float(accuracy_score(y_test, y_pred)),
@@ -54,9 +67,9 @@ def _compute_metrics(model, X_test, y_test, model_name: str) -> dict:
         "recall": float(recall_score(y_test, y_pred, zero_division=0)),
         "f1": float(f1_score(y_test, y_pred, zero_division=0)),
         "auc_roc": float(roc_auc_score(y_test, y_proba)),
-        "roc_fpr": fpr.tolist(),
-        "roc_tpr": tpr.tolist(),
-        "roc_thresholds": thresholds.tolist(),
+        "roc_fpr": fpr_clean.tolist(),
+        "roc_tpr": tpr_clean.tolist(),
+        "roc_thresholds": thresholds_clean.tolist(),
         "optimal_threshold": optimal_threshold,
     }
 

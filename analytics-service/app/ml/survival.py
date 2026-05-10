@@ -1,7 +1,17 @@
+import math
 import pandas as pd
 import numpy as np
 from lifelines import KaplanMeierFitter, CoxPHFitter
 from dataclasses import dataclass, field
+
+
+def _safe_float(v, default: float = 0.0) -> float:
+    """Return a JSON-safe float (never inf or nan)."""
+    try:
+        f = float(v)
+        return f if math.isfinite(f) else default
+    except (TypeError, ValueError):
+        return default
 
 
 @dataclass
@@ -117,7 +127,8 @@ def compute_kaplan_meier(df: pd.DataFrame) -> SurvivalResults:
             "censored": int(row.get("censored", 0)),
         })
 
-    median_survival = float(kmf.median_survival_time_) if not pd.isna(kmf.median_survival_time_) else 0.0
+    # median_survival_time_ is inf when >50% of the cohort is still censored — not JSON serialisable
+    median_survival = _safe_float(kmf.median_survival_time_, default=0.0)
 
     # Cox PH model
     cox_summary = _compute_cox(df_surv)
@@ -162,10 +173,10 @@ def _compute_cox(df_surv: pd.DataFrame) -> list[dict]:
         for _, row in summary.iterrows():
             result.append({
                 "covariate": str(row["covariate"]),
-                "exp_coef": round(float(row["exp(coef)"]), 4),
-                "p_value": round(float(row["p"]), 4),
-                "hr_lower": round(float(row.get("exp(coef) lower 95%", 0)), 4),
-                "hr_upper": round(float(row.get("exp(coef) upper 95%", 0)), 4),
+                "exp_coef": round(_safe_float(row["exp(coef)"], 1.0), 4),
+                "p_value": round(_safe_float(row["p"], 1.0), 4),
+                "hr_lower": round(_safe_float(row.get("exp(coef) lower 95%", 0), 0.0), 4),
+                "hr_upper": round(_safe_float(row.get("exp(coef) upper 95%", 0), 0.0), 4),
             })
         return result
     except Exception as e:
