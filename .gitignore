@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.venv/
+venv/
+
+# Dataset (too large for git — place manually)
+analytics-service/data/dataset.csv
+
+# Frontend build
+frontend/dist/
+frontend/node_modules/
+
+# Docker
+.docker/
+
+# IDE
+.vscode/
+.idea/
+*.swp

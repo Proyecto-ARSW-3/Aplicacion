@@ -1,0 +1,26 @@
+services:
+  analytics-service:
+    build: ./analytics-service
+    container_name: arep-analytics
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount local data folder so you can drop the real dataset without rebuilding
+      - ./analytics-service/data:/app/data
+    environment:
+      - DEBUG=false
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:80","http://frontend"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    container_name: arep-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      analytics-service:
+        condition: service_healthy
