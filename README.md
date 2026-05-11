@@ -52,31 +52,35 @@ El sistema adopta un patrón de **Arquitectura de Microservicios** distribuido e
 ### 1. Diagrama de Arquitectura
 
 ![Arquitectura del Sistema](docs/screenshots/architecture_diagram.png)
-*Descripción: Diagrama que muestra la interacción entre el usuario, el CDN de CloudFront, el almacenamiento de S3 para el frontend y la instancia EC2/Docker para el backend.*
+_Descripción: Diagrama que muestra la interacción entre el usuario, el CDN de CloudFront, el almacenamiento de S3 para el frontend y la instancia EC2/Docker para el backend._
 
 ### 2. Capa de Presentación (Frontend)
-*   **Tecnología:** React (Vite + TypeScript).
-*   **Alojamiento:** Los archivos estáticos se alojan en **Amazon S3**.
-*   **Distribución:** Se utiliza **Amazon CloudFront** como CDN para ofrecer acceso seguro vía **HTTPS** (mediante AWS Certificate Manager) y reducir la latencia global.
+
+- **Tecnología:** React (Vite + TypeScript).
+- **Alojamiento:** Los archivos estáticos se alojan en **Amazon S3**.
+- **Distribución:** Se utiliza **Amazon CloudFront** como CDN para ofrecer acceso seguro vía **HTTPS** (mediante AWS Certificate Manager) y reducir la latencia global.
 
 > **Evidencia de Despliegue Frontend:**
 > ![Evidencia S3/CloudFront](docs/screenshots/evidence_frontend.png)
 
 ### 3. Capa de Analítica (Backend)
-*   **Tecnología:** Python FastAPI.
-*   **Contenerización:** Se ejecuta sobre **Docker** en una instancia **Amazon EC2** (Amazon Linux 2023).
-*   **Seguridad:** Implementación de certificados SSL con **Certbot (Let's Encrypt)** y DNS dinámico con **DuckDNS**, permitiendo acceso seguro bajo el dominio `no-clases.duckdns.org`.
+
+- **Tecnología:** Python FastAPI.
+- **Contenerización:** Se ejecuta sobre **Docker** en una instancia **Amazon EC2** (Amazon Linux 2023).
+- **Seguridad:** Implementación de certificados SSL con **Certbot (Let's Encrypt)** y DNS dinámico con **DuckDNS**, permitiendo acceso seguro bajo el dominio `no-clases.duckdns.org`.
 
 > **Evidencia de Backend y Contenedores:**
 > ![Evidencia EC2/Docker](docs/screenshots/EC2.png)
 
 ### 4. Capa de Datos
-*   **Persistencia:** Utiliza **Amazon RDS for MySQL** para almacenar los resultados históricos de las predicciones y datos institucionales, garantizando la integridad y backups automáticos.
+
+- **Persistencia:** Utiliza **Amazon RDS for MySQL** para almacenar los resultados históricos de las predicciones y datos institucionales, garantizando la integridad y backups automáticos.
 
 > **Evidencia de Base de Datos:**
 > ![Evidencia RDS](docs/screenshots/evidence_rds.png)
 
 ### 5. Flujo de Comunicación y Seguridad
+
 1.  **Entrada:** El usuario accede vía HTTPS a CloudFront.
 2.  **API Gateway Interno:** El tráfico se redirige a la instancia EC2 mediante un Proxy Inverso (**Nginx**) que orquestra el tráfico entre el puerto 80/443 y el puerto 8000 del backend.
 3.  **Seguridad de Red:** Se configuraron **Security Groups** en AWS para restringir el tráfico solo a los puertos necesarios (80, 443, 8000).
@@ -158,7 +162,7 @@ Aplicacion/
 
 ```bash
 # 1. Navegar al directorio del proyecto
-cd "AREP Codigo/Aplicacion"
+cd "analytics-service"
 
 # 2. (Opcional) Colocar el dataset real:
 #    Descargar de Kaggle y renombrar a dataset.csv
@@ -266,44 +270,6 @@ analytics-service/data/dataset.csv
 
 # 4. El sistema lo detecta y entrena automáticamente al iniciar.
 #    O cargarlo desde el Dashboard usando el botón "Subir Dataset".
-```
-
----
-
-## Pipeline de Datos (DataPreprocessor)
-
-El `DataPreprocessor` (`ml/preprocessor.py`) transforma el CSV crudo en matrices
-listas para ML en 6 etapas:
-
-```
-CSV crudo
-    │
-    ▼ Etapa 1: load_and_clean()
-    │  • Auto-detecta separador (; o ,)
-    │  • Normaliza nombres de columnas (elimina tabs/espacios)
-    │  • Mapea Target: "Dropout"→0, "Graduate"→1, "Enrolled"→2
-    │
-    ▼ Etapa 2: prepare_binary()
-    │  • Excluye registros "Enrolled" (resultado desconocido)
-    │  • Re-etiqueta: Desertor→1, Graduado→0
-    │  • Resultado: ~3,630 registros con outcome definitivo
-    │
-    ▼ Etapa 3: build_feature_matrix()
-    │  • Selecciona 18 variables numéricas + 18 categóricas disponibles
-    │  • Imputa faltantes: numéricos→mediana, categóricos→moda
-    │
-    ▼ Etapa 4: StandardScaler (Z-score)
-    │  • fit() SOLO sobre entrenamiento (sin data leakage)
-    │  • z = (x - μ_train) / σ_train
-    │  • transform() aplicado a entrenamiento, prueba e inferencia
-    │
-    ▼ Etapa 5: train_test_split (80/20 estratificado)
-    │  • Mantiene proporción Desertor/Graduado en ambos conjuntos
-    │
-    ▼ Etapa 6: SMOTE (solo sobre entrenamiento)
-       • Genera instancias sintéticas de la clase minoritaria (Desertor)
-       • Resultado: distribución 50/50 en el conjunto de entrenamiento
-       • El conjunto de prueba permanece intacto (sin SMOTE)
 ```
 
 ---
@@ -467,35 +433,6 @@ de reintento si los modelos no están entrenados.
 Histograma de distribución de probabilidades de deserción (10 buckets). Tabla del
 índice de Youden con sensibilidad, especificidad y J para distintos umbrales del
 mejor modelo.
-
----
-
-## Dependencias Clave
-
-### Backend (`requirements.txt`)
-
-```
-fastapi
-uvicorn[standard]
-pandas
-numpy
-scikit-learn
-imbalanced-learn
-lifelines
-python-multipart    # para upload de archivos
-pydantic-settings
-```
-
-### Frontend (`package.json` — principales)
-
-```
-react, react-dom, react-router-dom
-recharts
-tailwindcss, postcss, autoprefixer
-lucide-react
-clsx
-typescript, vite
-```
 
 ---
 
