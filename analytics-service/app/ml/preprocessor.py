@@ -78,6 +78,9 @@ class DataPreprocessor:
     def load_and_clean(self, path: str) -> pd.DataFrame:
         try:
             df = pd.read_csv(path, sep=";")
+            # pandas doesn't raise when separator doesn't match — check columns
+            if "Target" not in df.columns:
+                df = pd.read_csv(path)
         except Exception:
             df = pd.read_csv(path)
 

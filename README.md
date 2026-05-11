@@ -430,50 +430,6 @@ mejor modelo.
 
 ---
 
-## Métricas y Visualizaciones
-
-### Métricas de clasificación
-
-| Métrica          | Fórmula               | Significado en este contexto                         |
-| ---------------- | --------------------- | ---------------------------------------------------- |
-| **Exactitud**    | (TP+TN)/(TP+TN+FP+FN) | % de clasificaciones correctas totales               |
-| **Precisión**    | TP/(TP+FP)            | De los alertados, ¿cuántos son realmente desertores? |
-| **Sensibilidad** | TP/(TP+FN)            | De los desertores reales, ¿cuántos detectamos?       |
-| **F1-Score**     | 2·P·R/(P+R)           | Media armónica entre precisión y sensibilidad        |
-| **AUC-ROC**      | ∫TPR d(FPR)           | Capacidad discriminativa global, independiente de τ  |
-
-### Interpretación del semáforo
-
-El semáforo no mide si los modelos son buenos o malos — mide el **estado de riesgo
-actual de la institución** según la distribución de probabilidades predichas y el
-umbral τ activo. Una institución con muchos estudiantes en situación socioeconómica
-vulnerable tendrá semáforo rojo incluso con modelos excelentes.
-
----
-
-## Guía de Desarrollo
-
-### Agregar un nuevo clasificador
-
-1. Crear una función `train_nuevo_modelo(X_train, X_test, y_train, y_test) -> TrainedModel`
-   en `analytics-service/app/ml/classifiers.py` siguiendo el patrón existente.
-2. Agregar la función a la lista `trainers` en `train_all_classifiers()`.
-3. El sistema automáticamente lo incluye en la comparativa y selecciona el mejor.
-
-### Agregar una nueva ruta al API
-
-1. Crear el endpoint en `analytics-service/app/api/routes/<recurso>.py`.
-2. Si requiere lógica de negocio compleja, agregar a `services/`.
-3. Registrar el router en `analytics-service/app/main.py`.
-
-### Agregar una nueva vista al Frontend
-
-1. Crear `frontend/src/pages/NuevaPagina.tsx`.
-2. Agregar la ruta en `frontend/src/App.tsx`.
-3. Agregar el enlace en `frontend/src/components/layout/Sidebar.tsx`.
-
----
-
 ## Dependencias Clave
 
 ### Backend (`requirements.txt`)
@@ -503,21 +459,77 @@ typescript, vite
 
 ---
 
-## Solución de Problemas Frecuentes
+## Tests y Cobertura
 
-| Síntoma                                                | Causa probable                                                     | Solución                                                            |
-| ------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------ |
-| Dashboard muestra "—" en todas las métricas            | El backend no terminó de entrenar                                  | Esperar 30-60 segundos y recargar                                   |
-| Página Supervivencia dice "Modelos no entrenados"      | El endpoint `/api/health` retorna `is_trained: false`              | Subir dataset y esperar entrenamiento                               |
-| `docker-compose up` falla con "port 80 already in use" | Otro proceso usa el puerto 80                                      | `docker-compose down` y verificar con `netstat -ano                 | findstr :80` |
-| Error 500 en `/api/analytics/survival`                 | Versiones antiguas del código sin sanitización de `inf`            | Verificar que `_safe_float()` está en `survival.py`                 |
-| Semáforo siempre verde                                 | Incompatibilidad en el formato de rangos (en-dash vs ASCII hyphen) | Verificar que el backend usa `-` ASCII en los labels de los buckets |
+El backend incluye una suite de **157 tests** que cubre el 95% del código. Los tests están en `analytics-service/tests/` y se ejecutan con `pytest`.
 
----
+### Estructura de tests
+
+```
+analytics-service/
+├── tests/
+│   ├── conftest.py            # Fixtures compartidas (dataset sintético, manager entrenado, TestClient)
+│   ├── test_preprocessor.py   # 23 tests — DataPreprocessor (carga, limpieza, SMOTE, Z-score)
+│   ├── test_classifiers.py    # 19 tests — 5 clasificadores + _compute_metrics
+│   ├── test_survival.py       # 24 tests — Kaplan-Meier, Cox PH, _safe_float
+│   ├── test_model_manager.py  # 32 tests — ModelManager completo + _risk_label
+│   ├── test_services.py       # 28 tests — analytics_service + prediction_service
+│   └── test_api.py            # 31 tests — todos los endpoints REST (200, 503, 422)
+├── pytest.ini                 # Configuración: coverage mínimo 80%, reporte HTML
+└── requirements-dev.txt       # Dependencias de test (pytest, pytest-cov, httpx)
+```
+
+### Instalar dependencias de test
+
+```bash
+cd analytics-service
+pip install -r requirements-dev.txt
+```
+
+### Correr todos los tests con cobertura
+
+```bash
+cd analytics-service
+pytest
+```
+
+Esto muestra en la terminal el resultado de cada test y la tabla de cobertura por módulo. Además genera el reporte HTML detallado en `htmlcov/`.
+
+### Ver el reporte HTML
+
+```bash
+# Windows
+start htmlcov/index.html
+
+# macOS
+open htmlcov/index.html
+
+# Linux
+xdg-open htmlcov/index.html
+```
+
+### Resultados esperados
+
+```
+157 passed in ~9s
+
+Name                                 Stmts   Miss  Cover
+---------------------------------------------------------
+app\api\routes\analytics.py             24      0   100%
+app\api\routes\models.py                19      0   100%
+app\schemas\schemas.py                  89      0   100%
+app\services\prediction_service.py      38      0   100%
+app\ml\model_manager.py                107      3    97%
+app\ml\classifiers.py                   96      5    95%
+app\ml\survival.py                      94      5    95%
+app\services\analytics_service.py       43      2    95%
+app\ml\preprocessor.py                  76      7    91%
+app\main.py                             28      3    89%
+app\api\routes\data.py                  43     10    77%
+---------------------------------------------------------
+TOTAL                                  710     36    95%
+```
 
 ## Información del Proyecto
 
 - **Dataset:** [UCI ML Repository — Predict Students' Dropout](https://doi.org/10.24432/C5MC89)
-- **Artículo académico:** `../paper/Paper_AREP/latex/articulo_final.tex`
-- **Rama principal:** `main`
-- **Licencia:** Uso académico — Escuela Colombiana de Ingeniería Julio Garavito
